@@ -21,7 +21,7 @@ only: do not implement the environment or Q-learning in this lab.
 - This repository root is the lab4 configuration directory. Keep changes inside
   this repository; do not modify the parent aima-python source.
 - Docstrings and type hints on every function and class
-- Tests go in lab4/tests/ and use pytest
+- Tests go in /tests and use pytest
 
 ## Strategy 1: Memory
 - Readings: AIMA ch. 12 (uncertainty), 17 (MDPs), 22 (RL)
