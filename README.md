@@ -1,72 +1,67 @@
-# AIMA Lab 4 - Strategy 1: Memory
+# CS440 Lab 4 - Strategy 1: Persistent Memory (Write)
 
-Configuration-only preparation for the CS 440 vacuum-robot project using
-aima-python. This repository demonstrates persistent project memory and
-keyword-triggered context loading. It does not implement the environment or
-Q-learning.
+This repository sets up an agent's memory for a vacuum robot that will later
+learn with Q-learning in a 4x4 grid world. It uses context engineering
+**Strategy 1 (Write)**: the agent's knowledge is written into files at
+different levels, so it never has to be re-explained, and detailed notes are
+loaded only when needed. No Q-learning code yet: this lab is setup only.
 
 ## Structure
 
-This checkout is the lab4 configuration directory. Launch Claude Code from
-the repository root. If used inside the team's aima-python fork, place this
-directory at `lab4/` and launch Claude Code there.
-
-```text
-.
-|-- AGENTS.md
-|-- CLAUDE.md
-|-- README.md
-|-- .gitattributes
-|-- .claude/
-|   |-- settings.json
-|   `-- context/
-|       |-- environment.md
-|       |-- mdp.md
-|       `-- qlearning.md
-`-- scripts/
-    `-- context-switcher.sh
+```
+CLAUDE.md                     Entry point Claude Code reads every session; imports AGENTS.md
+AGENTS.md                     PROJECT memory: grid, rewards, unknown T and R, coding standards
+user-memory/CLAUDE.md         USER memory example: personal preferences (really lives in ~/.claude/)
+.claude/settings.json         Registers the UserPromptSubmit hook
+.claude/context/              DETAILED context, loaded on demand by the hook
+    environment.md            Grid layout, cells, actions, what the agent doesn't know
+    mdp.md                    AIMA ch. 17: MDPs, Bellman, why value iteration doesn't apply
+    qlearning.md              AIMA ch. 22: Q-update, exploration, aima-python QLearningAgent
+scripts/context-switcher.sh   Hook script: picks context files by prompt keywords
+.gitattributes                Keeps the .sh file on LF line endings (Windows-safe)
 ```
 
-## How memory works
+## The three memory levels
 
-- [AGENTS.md](AGENTS.md) holds shared project facts, scope, and coding standards.
-- [CLAUDE.md](CLAUDE.md) imports that memory using Claude Code's `@` syntax.
-- [settings.json](.claude/settings.json) registers a `UserPromptSubmit` hook
-  that runs [context-switcher.sh](scripts/context-switcher.sh) with Bash.
-- The hook prints matching topic notes into the conversation and records loaded
-  filenames in a temporary, session-specific file. Repeated prompts in the same
-  session do not inject the same note again. A new session loads notes afresh.
-- [.gitattributes](.gitattributes) keeps shell scripts on LF line endings.
+| Level | File | Loaded | Why |
+| --- | --- | --- | --- |
+| Project | CLAUDE.md -> AGENTS.md | Every session | Facts every task needs; shared through git |
+| User | ~/.claude/CLAUDE.md (example in user-memory/) | Every session, all projects | Personal style, not project facts |
+| Detailed context | .claude/context/*.md | Only when the prompt needs it | Keeps the context window small |
 
-| Prompt keywords (case-insensitive) | Memory loaded |
-| --- | --- |
-| grid, wall, cell, reward, terminal, environment | [Environment](.claude/context/environment.md) |
-| mdp, bellman, value iteration, policy iteration, transition | [MDPs](.claude/context/mdp.md) |
-| q-learning, qlearning, q learning, q-value, epsilon, explor, reinforcement | [Q-learning](.claude/context/qlearning.md) |
+## Design decisions
 
-A prompt can match multiple topics. Other assistants must use their own
-instruction-loading mechanism; the hook is specific to Claude Code.
+- **AGENTS.md + CLAUDE.md:** AGENTS.md is an open standard many coding agents
+  read, so the project memory isn't tied to one tool. CLAUDE.md imports it with
+  `@AGENTS.md`, the import syntax from the lecture.
+- **Short always-on memory:** everything in CLAUDE.md/AGENTS.md costs tokens on
+  every turn, so long notes live in .claude/context/ instead. This prevents
+  context overload and context confusion.
+- **The hook lives in settings.json, the logic lives in the script.** The script
+  matches keywords (e.g. "Q-learning" loads qlearning.md).
+- **Idempotent injection:** `grep -qxF` checks whether a file was already loaded
+  this session, so the context never fills with duplicates.
+- **Keywords instead of git branches:** the lecture's example also switches by
+  branch name; this lab has no topic branches, so prompt keywords are the useful signal.
 
-## Project constraints
+## How to try it
 
-The robot starts at `(0,0)` on a 4x4 grid. Cell `(1,1)` is a wall; terminal
-rewards are -1 at `(3,1)` and +10 at `(3,3)`. Other cells have reward 0.
-The learner does not know the transition model or reward function and will
-learn from experience in a later lab. See [shared memory](AGENTS.md) for the
-full constraints and [topic notes](.claude/context/environment.md) for details.
+1. Open a terminal in this repo root and run `claude`.
+2. Ask: "Explain the Q-learning update for our grid." The hook loads qlearning.md.
+3. Ask again in the same session: the file isn't loaded twice.
 
-## Validation
+Test the script on its own in Git Bash:
 
-Requires Claude Code and Bash (for example, Git Bash on Windows). The hook uses
-standard shell utilities: `cat`, `sed`, `touch`, and `grep`.
+```bash
+rm -f /tmp/lab4-context-demo.txt
+echo '{"session_id":"demo","prompt":"explain q-learning"}' | bash scripts/context-switcher.sh
+echo '{"session_id":"demo","prompt":"explain q-learning"}' | bash scripts/context-switcher.sh
+```
 
-1. Launch Claude Code from this directory and confirm it loads the shared memory.
-2. In a fresh session, submit "Explain Q-learning". Confirm that the Q-learning
-   notes appear in the hook context.
-3. Repeat the prompt in the same session. Confirm the notes are not injected again.
-4. Submit "Describe the grid", then "Explain Bellman". Confirm that the
-   environment and MDP notes load independently.
-5. Start a new session and repeat the Q-learning prompt. Confirm the notes load again.
+The first run prints qlearning.md; the second prints nothing.
 
-Shell-level checks can validate routing and deduplication, but do not prove
-native Claude Code discovery or context injection.
+## References
+
+- Lecture: Agentic AI - Context Engineering, Strategy 1 (pp. 21-28)
+- Russell and Norvig, AIMA ch. 12, 17, 22
+- aima-python: mdp.py, reinforcement_learning.py
